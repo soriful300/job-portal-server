@@ -21,6 +21,9 @@ const client = new MongoClient(uri, {
 async function run() {
   try {
     const jobsCollection = client.db("job-portal").collection("job-collection");
+    const submitJobCollection = client
+      .db("job-portal")
+      .collection("submit-job");
 
     app.get("/jobs", async (req, res) => {
       const result = await jobsCollection.find({}).toArray();
@@ -34,6 +37,35 @@ async function run() {
       res.send(result);
     });
 
+    app.post("/submitInfo", (req, res) => {
+      const { linkedin, gitHub, resume, name, email, id } = req.body;
+
+      const doc = {
+        linkedin: linkedin,
+        gitHub: gitHub,
+        resume: resume,
+        name: name,
+        email: email,
+        id: id,
+      };
+      const result = submitJobCollection.insertOne(doc);
+      res.send(result);
+    });
+
+    app.get("/singleUserData/:email", async (req, res) => {
+      const email = req.params.email;
+      const query = { email: email };
+      const result = await submitJobCollection.find(query).toArray();
+      for (const application of result) {
+        const applicationId = application.id;
+        const jobQuery = { _id: new ObjectId(applicationId) };
+        const job = await jobsCollection.findOne(jobQuery);
+        application.company = job.company;
+        application.title = job.title;
+        application.company_log = job.company_logo;
+      }
+      res.send(result);
+    });
     await client.connect();
     // Send a ping to confirm a successful connection
     await client.db("admin").command({ ping: 1 });
