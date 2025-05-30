@@ -25,6 +25,21 @@ async function run() {
       .db("job-portal")
       .collection("submit-job");
 
+    app.get("/jobs/applications", async (req, res) => {
+      const email = req.params.email;
+      const query = { hr_email: email };
+      const jobs = await jobsCollection.find(query).toArray();
+
+      for (const job of jobs) {
+        const applicationQuery = { id: job._id.toString() };
+        const application_count = await jobsCollection.countDocuments(
+          applicationQuery
+        );
+        job.application_count = application_count;
+        res.send(jobs);
+      }
+    });
+
     app.get("/jobs", async (req, res) => {
       const email = req.query.email;
       const query = {};
@@ -119,11 +134,16 @@ async function run() {
       const doc = {
         $set: status,
       };
-      const result = await jobsCollection.updateOne(query, doc);
+      const result = await submitJobCollection.updateOne(query, doc);
       res.send(result);
     });
 
-    
+    app.get("/application/job/:job_id", async (req, res) => {
+      const job_id = req.params.job_id;
+      const query = { id: job_id };
+      const result = await submitJobCollection.find(query).toArray();
+      res.send(result);
+    });
 
     await client.connect();
     // Send a ping to confirm a successful connection
