@@ -26,7 +26,12 @@ async function run() {
       .collection("submit-job");
 
     app.get("/jobs", async (req, res) => {
-      const result = await jobsCollection.find({}).toArray();
+      const email = req.query.email;
+      const query = {};
+      if (email) {
+        query.hr_email = email;
+      }
+      const result = await jobsCollection.find(query).toArray();
       res.send(result);
     });
 
@@ -35,6 +40,45 @@ async function run() {
       const query = { _id: new ObjectId(id) };
       const result = await jobsCollection.findOne(query);
       res.send(result);
+    });
+
+    app.post("/addNewJob", async (req, res) => {
+      const {
+        title,
+        location,
+        jobType,
+        category,
+        applicationDeadline,
+        salaryRange,
+        description,
+        company,
+        requirements,
+        responsibilities,
+        status,
+        hr_email,
+        hr_name,
+        company_logo,
+      } = req.body;
+      const doc = {
+        title,
+        location,
+        jobType,
+        category,
+        applicationDeadline,
+        salaryRange,
+        description,
+        company,
+        requirements,
+        responsibilities,
+        status,
+        hr_email,
+        hr_name,
+        company_logo,
+      };
+      const result = await jobsCollection.insertOne(doc);
+      res.send(result);
+      console.log(doc);
+      f;
     });
 
     app.post("/submitInfo", (req, res) => {
@@ -66,6 +110,21 @@ async function run() {
       }
       res.send(result);
     });
+
+    app.patch("/statusUpdate/:id", async (req, res) => {
+      const id = req.params.id;
+      const status = req.body;
+      console.log(status, id);
+      const query = { _id: new ObjectId(id) };
+      const doc = {
+        $set: status,
+      };
+      const result = await jobsCollection.updateOne(query, doc);
+      res.send(result);
+    });
+
+    
+
     await client.connect();
     // Send a ping to confirm a successful connection
     await client.db("admin").command({ ping: 1 });
