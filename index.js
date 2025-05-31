@@ -3,8 +3,16 @@ const express = require("express");
 const app = express();
 const port = process.env.port || 3000;
 const cors = require("cors");
+const jwt = require("jsonwebtoken");
+const cookieParser = require("cookie-parser");
 app.use(express.json());
-app.use(cors());
+app.use(cookieParser());
+app.use(
+  cors({
+    origin: ["http://localhost:5173"],
+    credentials: true,
+  })
+);
 
 const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
 const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASSWORD}@userdatabase.06ovt0z.mongodb.net/?retryWrites=true&w=majority&appName=userDatabase`;
@@ -25,19 +33,54 @@ async function run() {
       .db("job-portal")
       .collection("submit-job");
 
-    app.get("/jobs/applications", async (req, res) => {
+    const logger = (req, res, next) => {
+      console.log("inside the logger middleware");
+      next();
+    };f
+    const VerifyToken = (req, res, next) => {
+      const token = req.cookies.token;
+      console.log("cookie in the middleware", token);
+      if (!token) {
+        return res.status(401).send({ message: "unauthorized access" });
+      }
+      jwt.verify(token, process.env.JWT_ACCESS_SECRET, (err, decoded) => {
+        if (err) {
+          return res.status(401).send({ message: "unauthorized access" });
+        }
+        console.log(decoded);
+      });
+      next();
+    };
+
+    app.post("/jwt", async (req, res) => {
+      const { email } = req.body;
+      const userData = { email };
+      const token = jwt.sign(userData, process.env.JWT_ACCESS_SECRET, {
+        expiresIn: "1d",
+      });
+
+      res.cookie("token", token, {
+        httpOnly: true,
+        secure: false,
+      });
+      res.send("Logged in, token set in cookie!");
+    });
+
+    app.get("/jobs/applications/:email", async (req, res) => {
       const email = req.params.email;
       const query = { hr_email: email };
       const jobs = await jobsCollection.find(query).toArray();
 
       for (const job of jobs) {
         const applicationQuery = { id: job._id.toString() };
-        const application_count = await jobsCollection.countDocuments(
+
+        const application_count = await submitJobCollection.countDocuments(
           applicationQuery
         );
+
         job.application_count = application_count;
-        res.send(jobs);
       }
+      res.send(jobs);
     });
 
     app.get("/jobs", async (req, res) => {
@@ -92,7 +135,7 @@ async function run() {
       };
       const result = await jobsCollection.insertOne(doc);
       res.send(result);
-      console.log(doc);
+
       f;
     });
 
@@ -111,7 +154,7 @@ async function run() {
       res.send(result);
     });
 
-    app.get("/singleUserData/:email", async (req, res) => {
+    app.get("/singleUserData/:email", logger, VerifyToken, async (req, res) => {
       const email = req.params.email;
       const query = { email: email };
       const result = await submitJobCollection.find(query).toArray();
@@ -129,7 +172,7 @@ async function run() {
     app.patch("/statusUpdate/:id", async (req, res) => {
       const id = req.params.id;
       const status = req.body;
-      console.log(status, id);
+
       const query = { _id: new ObjectId(id) };
       const doc = {
         $set: status,
